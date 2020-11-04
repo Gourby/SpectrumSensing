@@ -1,0 +1,71 @@
+import numpy as np
+import h5py
+import random
+import scipy.io as sio
+from keras.models import load_model
+from scipy.fftpack import fft
+from sklearn import metrics
+from Spectrum_classes import Spectrum_scoredata
+from DP_eval_function import snr_pd_plot,NormMinandMax,snr_acc_plot,snr_auc_plot,roc_plot,cm_plot,snr_sigacc_plot,snr_sigpd_plot
+
+num_classes = 2
+begin_snr = -20
+end_snr = 20
+
+LSTM_CNN_para_acc_matrix = np.arange(10*(end_snr-begin_snr+1)).reshape(10,(end_snr-begin_snr+1))
+LSTM_CNN_para_acc_matrix=LSTM_CNN_para_acc_matrix.astype(np.float64)
+LSTM_CNN_para_pd_matrix = np.arange(10*(end_snr-begin_snr+1)).reshape(10,(end_snr-begin_snr+1))
+LSTM_CNN_para_pd_matrix=LSTM_CNN_para_pd_matrix.astype(np.float64)
+LSTM_CNN_para_model = load_model('D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\model\\LSTM_CNN_FSK1_model.h5')
+signals_lable = np.concatenate((np.ones(900),np.zeros(900)),axis = 0)
+signals_lable = signals_lable.reshape((1800,1))
+
+for snr_i in range(begin_snr,end_snr+1):
+    if snr_i <0:
+       load_data_path_net = 'D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\signal sample LFM\\original_data'+str(abs(snr_i))+'.mat'
+    else:
+       load_data_path_net = 'D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\signal sample LFM\\original_data_'+str(snr_i)+'.mat'
+    print(load_data_path_net)
+    load_data_net = h5py.File(load_data_path_net,'r')
+    for mode_num in range(1,11):
+        mode_signal = 'mode'+str(mode_num)
+        mode_noise = 'mode_noise'+str(mode_num)
+        spectrum_mode_signal = load_data_net[mode_signal][:]
+        spectrum_mode_noise = load_data_net[mode_noise][:]
+       
+        spectrum_mode_signal = np.transpose(spectrum_mode_signal)
+        spectrum_mode_noise = np.transpose(spectrum_mode_noise)
+       
+        spectrum_mode_signal = spectrum_mode_signal[300:,1:]
+        spectrum_mode_noise = spectrum_mode_noise[300:,1:]
+        print(spectrum_mode_signal.shape)
+        spectrum_mode_data = np.concatenate((spectrum_mode_signal,spectrum_mode_noise),axis = 0)
+        print(spectrum_mode_data.shape)
+        spectrum_mode_lable = signals_lable
+        
+        for i in range(0,len(spectrum_mode_data)):
+            spectrum_mode_data[i] = NormMinandMax(spectrum_mode_data[i],0,1)
+        index_train = [i for i in range(len(spectrum_mode_data))]
+
+        random.shuffle(index_train)
+
+        spectrum_mode_data = spectrum_mode_data[index_train]
+        spectrum_mode_lable = spectrum_mode_lable[index_train]
+        spectrum_mode_data_LSTM_CNN_para = spectrum_mode_data
+        spectrum_mode_data_LSTM_CNN_para = spectrum_mode_data_LSTM_CNN_para.astype('float32')
+        LSTM_CNN_para_preYscore = LSTM_CNN_para_model.predict(spectrum_mode_data_LSTM_CNN_para)
+        LSTM_CNN_para_prelable = np.argmax(LSTM_CNN_para_preYscore,axis = 1)
+        cm_LSTM_CNN_para = metrics.confusion_matrix(spectrum_mode_lable[:,0], LSTM_CNN_para_prelable)
+        pd_LSTM_CNN_para = cm_LSTM_CNN_para[1,1]/(cm_LSTM_CNN_para[1,1]+cm_LSTM_CNN_para[1,0])
+        print('pdLSTM_CNN_para',pd_LSTM_CNN_para)
+        acc_LSTM_CNN_para = metrics.accuracy_score(spectrum_mode_lable[:,0], LSTM_CNN_para_prelable)
+        print('accLSTM_CNN_para',acc_LSTM_CNN_para)
+        LSTM_CNN_para_acc_matrix[mode_num-1,snr_i-begin_snr] =  acc_LSTM_CNN_para 
+        LSTM_CNN_para_pd_matrix[mode_num-1,snr_i-begin_snr] =  pd_LSTM_CNN_para
+    load_data_net.close()
+snr_plot = np.linspace(begin_snr,end_snr,end_snr-begin_snr+1)
+LSTM_CNN_para_acc_plt = snr_sigacc_plot(LSTM_CNN_para_acc_matrix,snr_plot)
+LSTM_CNN_para_acc_plt.savefig('D:\\Spectrum_sense\\Sectrum Sense paper\\pictrue\\LSTM_CNN_FSK_acc_plot')
+LSTM_CNN_para_pd_plt = snr_sigpd_plot(LSTM_CNN_para_pd_matrix,snr_plot)
+LSTM_CNN_para_pd_plt.savefig('D:\\Spectrum_sense\\Sectrum Sense paper\\pictrue\\LSTM_CNN_FSK_pd_plot')
+
