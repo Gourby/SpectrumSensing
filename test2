@@ -1,0 +1,250 @@
+import numpy as np
+import h5py
+import random
+from keras.models import load_model
+from scipy.fftpack import fft
+from sklearn import metrics
+from Spectrum_classes import Spectrum_scoredata
+from DP_eval_function import snr_pd_plot,NormMinandMax,snr_acc_plot,snr_auc_plot,roc_plot
+#from collections import Counter
+
+
+
+num_classes = 2
+begin_snr = -20
+end_snr = 20
+
+LSTM_scoredata = []
+CNN1D_scoredata = []
+LSTM_CNN_para_scoredata = []
+ED_scoredata = []
+MME_scoredata = []
+
+LSTM_auc = []
+CNN1D_auc = []
+LSTM_CNN_para_auc = []
+
+
+LSTM_acc = []
+CNN1D_acc = []
+LSTM_CNN_para_acc = []
+ED_acc = []
+MME_acc = []
+
+LSTM_pd = []
+CNN1D_pd = []
+LSTM_CNN_para_pd = []
+ED_pd = []
+MME_pd = []
+
+##模型加载
+LSTM_model = load_model('D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\model\\LSTM_FSK11_model.h5')
+CNN1D_model = load_model('D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\model\\CNN_LFM2_model.h5')
+LSTM_CNN_para_model = load_model('D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\model\\LSTM_CNN_FSK1_model.h5')
+
+
+##数据加载
+load_scoreY_path = 'D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\sample\\Test_scores\\score_Y.mat'
+load_scoreY = h5py.File(load_scoreY_path,'r')
+
+ED_lable_temp = load_scoreY['lable_ED'][:]
+MME_lable_temp = load_scoreY['lable_MME'][:]
+
+lable_shape = ED_lable_temp.shape
+print(lable_shape)  
+lable_M = lable_shape[1]
+load_scoreY.close()
+
+for num in range(begin_snr,end_snr+1):
+#load data
+   if num <0:
+      load_data_path_net = 'D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\sample\\data test\\spectrum_data_snrtest'+'_'+str(abs(num))+'.mat'
+   else:
+      load_data_path_net = 'D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\sample\\data test\\spectrum_data_snrtest'+str(num)+'.mat'
+   print(load_data_path_net)    
+   load_data_net = h5py.File(load_data_path_net,'r')
+   
+   Spectrum_test_dataX_net = load_data_net['spectrum_data_testX'][:]
+   Spectrum_test_dataY_net = load_data_net['spectrum_data_testY'][:]
+   load_data_net.close()
+   Spectrum_test_dataX_net = np.transpose(Spectrum_test_dataX_net)
+   Spectrum_test_dataX_net_fft = abs(fft(Spectrum_test_dataX_net))
+ #  Spectrum_test_dataX_net = Spectrum_test_dataX_net.astype('float32')
+# 归一化和顺序打乱
+   for i in range(0,len(Spectrum_test_dataX_net)):
+      Spectrum_test_dataX_net[i] = NormMinandMax(Spectrum_test_dataX_net[i],0,1)
+      Spectrum_test_dataX_net_fft[i] = NormMinandMax(Spectrum_test_dataX_net_fft[i],0,1)
+   index_train = [i for i in range(len(Spectrum_test_dataX_net))]
+
+   random.shuffle(index_train)
+
+   Spectrum_test_dataX_net = Spectrum_test_dataX_net[index_train]
+   Spectrum_test_dataX_net_fft = Spectrum_test_dataX_net_fft[index_train]
+   Spectrum_test_dataY_net = Spectrum_test_dataY_net[index_train]
+   ED_lable = ED_lable_temp[index_train]
+   MME_lable = MME_lable_temp[index_train]
+   ED_lable = np.transpose(ED_lable)  
+   MME_lable = np.transpose(MME_lable)
+   print(ED_lable.shape)
+#   Spectrum_test_dataY_net_test = keras.utils.to_categorical(Spectrum_test_dataY_net, num_classes)
+   
+   ##LSTM DATAS
+   Spectrum_test_dataX_LSTM = Spectrum_test_dataX_net.reshape(-1,60,60)
+   Spectrum_test_dataX_LSTM = Spectrum_test_dataX_LSTM.astype('float32')
+   ##CNN1D DATAs
+   Spectrum_test_dataX_CNN1D = Spectrum_test_dataX_net.reshape(-1, 3600,1)
+   Spectrum_test_dataX_CNN1D = Spectrum_test_dataX_CNN1D.astype('float32')
+
+
+   ##LSTM_CNN_para DATAS
+   Spectrum_test_dataX_LSTM_CNN_para = Spectrum_test_dataX_net
+   Spectrum_test_dataX_LSTM_CNN_para = Spectrum_test_dataX_LSTM_CNN_para.astype('float32')
+
+  
+##模型预测
+  ##模型的score
+  ##LSTM
+   LSTM_preYscore = LSTM_model.predict_proba(Spectrum_test_dataX_LSTM)
+  ##CNN1D
+   CNN1D_preYscore = CNN1D_model.predict_proba(Spectrum_test_dataX_CNN1D)
+
+
+  
+   #LSTM_CNN_para
+   LSTM_CNN_para_preYscore = LSTM_CNN_para_model.predict(Spectrum_test_dataX_LSTM_CNN_para)
+
+
+## lables
+   LSTM_prelable = np.argmax(LSTM_preYscore,axis = 1)
+   CNN1D_prelable = np.argmax(CNN1D_preYscore,axis = 1)
+  
+   LSTM_CNN_para_prelable = np.argmax(LSTM_CNN_para_preYscore,axis = 1)
+
+#ROC曲线和AUC值计算 
+   #LSTM
+   fpr_LSTM, tpr_LSTM, thresholds_LSTM = metrics.roc_curve(Spectrum_test_dataY_net[:,0], LSTM_preYscore[:,1])
+   roc_auc_LSTM = metrics.auc(fpr_LSTM, tpr_LSTM)
+   #CNN1D
+   fpr_CNN1D, tpr_CNN1D, thresholds_CNN1D = metrics.roc_curve(Spectrum_test_dataY_net[:,0], CNN1D_preYscore[:,1])
+   roc_auc_CNN1D = metrics.auc(fpr_CNN1D, tpr_CNN1D)
+   #LSTM_CNN_para
+   fpr_LSTM_CNN_para, tpr_LSTM_CNN_para, thresholds_LSTM_CNN_para = metrics.roc_curve(Spectrum_test_dataY_net[:,0],LSTM_CNN_para_preYscore[:,1])
+   roc_auc_LSTM_CNN_para = metrics.auc(fpr_LSTM_CNN_para, tpr_LSTM_CNN_para)
+##混淆矩阵
+   cm_LSTM = metrics.confusion_matrix(Spectrum_test_dataY_net[:,0], LSTM_prelable)
+   cm_CNN1D = metrics.confusion_matrix(Spectrum_test_dataY_net[:,0], CNN1D_prelable)
+ 
+   cm_LSTM_CNN_para = metrics.confusion_matrix(Spectrum_test_dataY_net[:,0], LSTM_CNN_para_prelable)
+ 
+   cm_ED = metrics.confusion_matrix(Spectrum_test_dataY_net[:,0], ED_lable[num-begin_snr,:])
+   cm_MME = metrics.confusion_matrix(Spectrum_test_dataY_net[:,0], MME_lable[num-begin_snr,:])
+  ##召回率Pd
+   pd_LSTM = cm_LSTM[1,1]/(cm_LSTM[1,1]+cm_LSTM[1,0])
+   pd_CNN1D = cm_CNN1D[1,1]/(cm_CNN1D[1,1]+cm_CNN1D[1,0])
+
+   pd_LSTM_CNN_para = cm_LSTM_CNN_para[1,1]/(cm_LSTM_CNN_para[1,1]+cm_LSTM_CNN_para[1,0])
+
+   pd_ED = cm_ED[1,1]/(cm_ED[1,1]+cm_ED[1,0])
+   pd_MME = cm_MME[1,1]/(cm_MME[1,1]+cm_MME[1,0])
+ ##模型准确率  
+   acc_LSTM = metrics.accuracy_score(Spectrum_test_dataY_net[:,0], LSTM_prelable)
+   acc_CNN1D = metrics.accuracy_score(Spectrum_test_dataY_net[:,0], CNN1D_prelable)
+
+   acc_LSTM_CNN_para = metrics.accuracy_score(Spectrum_test_dataY_net[:,0], LSTM_CNN_para_prelable)
+
+   acc_ED = metrics.accuracy_score(Spectrum_test_dataY_net[:,0], ED_lable[num-begin_snr,:])
+   acc_MME = metrics.accuracy_score(Spectrum_test_dataY_net[:,0], MME_lable[num-begin_snr,:])
+##数据组织
+   #data_struct
+   LSTM_data_struct = Spectrum_scoredata(fpr_LSTM,tpr_LSTM,cm_LSTM)
+   CNN1D_data_struct = Spectrum_scoredata(fpr_CNN1D,tpr_CNN1D,cm_CNN1D)
+
+   LSTM_CNN_para_data_struct = Spectrum_scoredata(fpr_LSTM_CNN_para,tpr_LSTM_CNN_para,cm_LSTM_CNN_para)
+
+   ED_data_struct = Spectrum_scoredata(0,0,cm_ED)
+   MME_data_struct = Spectrum_scoredata(0,0,cm_MME)
+#data scoredata
+   LSTM_scoredata.append(LSTM_data_struct)
+   CNN1D_scoredata.append(CNN1D_data_struct)
+
+   LSTM_CNN_para_scoredata.append(LSTM_CNN_para_data_struct)
+
+   ED_scoredata.append(ED_data_struct)
+   MME_scoredata.append(MME_data_struct) 
+#auc datas
+   LSTM_auc.append(roc_auc_LSTM)
+   CNN1D_auc.append(roc_auc_CNN1D) 
+
+   LSTM_CNN_para_auc.append(roc_auc_LSTM_CNN_para)
+
+#acc datas
+   LSTM_acc.append(acc_LSTM)
+   CNN1D_acc.append(acc_CNN1D)
+
+   LSTM_CNN_para_acc.append(acc_LSTM_CNN_para)
+
+   ED_acc.append(acc_ED)
+   MME_acc.append(acc_MME)
+#pd datas
+   LSTM_pd.append(pd_LSTM)
+   CNN1D_pd.append(pd_CNN1D)
+
+   LSTM_CNN_para_pd.append(pd_LSTM_CNN_para)
+
+   ED_pd.append(pd_ED)
+   MME_pd.append(pd_MME)
+#  plt.plot(fpr, tpr, lw=1, label='ROC fold %d (area = %0.2f)')
+#  plt.show()
+#for lable_culum in range(0,lable_M):
+Score_datas = {'LSTM_scoredata':LSTM_scoredata,'CNN1D_scoredata':CNN1D_scoredata,'LSTM_CNN_para_scoredata':LSTM_CNN_para_scoredata,'ED_scoredata':ED_scoredata,'MME_scoredata':MME_scoredata}   
+AUC_datas = {'LSTM_auc':LSTM_auc,'CNN1D_auc':CNN1D_auc,'LSTM_CNN_para_auc':LSTM_CNN_para_auc}
+ACC_datas = {'LSTM_acc':LSTM_acc,'CNN1D_acc':CNN1D_acc,'LSTM_CNN_para_acc':LSTM_CNN_para_acc,'ED_acc':ED_acc,'MME_acc':MME_acc}
+PD_datas = {'LSTM_pd':LSTM_pd,'CNN1D_pd':CNN1D_pd,'LSTM_CNN_para_pd':LSTM_CNN_para_pd,'ED_pd':ED_pd,'MME_pd':MME_pd}
+##数据绘图
+for num in range(0,lable_M):  
+##绘制ROC曲线  
+    roc_plt = roc_plot(Score_datas,num)
+    roc_plt.savefig('D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\all picture\\roc\\roc_plot'+str(num-20),dpi=500)
+
+#绘制混淆矩阵
+  #  cm_plot_LSTM = Score_datas['LSTM_scoredata'][num].cm_temp
+  #  cm_plot_CNN1D = Score_datas['CNN1D_scoredata'][num].cm_temp
+   # cm_plot_CNN2D = Score_datas['CNN2D_scoredata'][num].cm_temp
+  #  cm_plot_CNN_para = Score_datas['CNN_para_scoredata'][num].cm_temp
+  #   cm_plot_LSTM_CNN_serial = Score_datas['LSTM_CNN_serial_scoredata'][num].cm_temp
+  #  cm_plot_ED = Score_datas['ED_scoredata'][num].cm_temp
+   # cm_plot_MME = Score_datas['MME_scoredata'][num].cm_temp
+    
+  #  cm_LSTM_plt = cm_plot(cm_plot_LSTM)
+ #   cm_CNN1D_plt = cm_plot(cm_plot_CNN1D)
+ #   cm_CNN2D_plt = cm_plot(cm_plot_CNN2D)
+ #   cm_CNN_para_plt = cm_plot(cm_plot_CNN_para)
+ #   cm_LSTM_CNN_para_plt = cm_plot(cm_plot_LSTM_CNN_para)
+ #   cm_LSTM_CNN_serial_plt = cm_plot(cm_plot_LSTM_CNN_serial)
+ #   cm_ED_plt = cm_plot(cm_plot_ED)
+ #   cm_MME_plt = cm_plot(cm_plot_MME)
+    
+ #   cm_LSTM_plt.savefig('D:\\programers\\programmers\\SectrumSenseLSTM\\cm_pictrues\\cm_plot_LSTM'+str(num-15))
+ #   cm_CNN1D_plt.savefig('D:\\programers\\programmers\\SectrumSenseLSTM\\cm_pictrues\\cm_plot_CNN1D'+str(num-15))
+ #   cm_CNN2D_plt.savefig('D:\\programers\\programmers\\SectrumSenseLSTM\\cm_pictrues\\cm_plot_CNN2D'+str(num-15))
+ #   cm_CNN_para_plt.savefig('D:\\programers\\programmers\\SectrumSenseLSTM\\cm_pictrues\\cm_plot_CNN_para'+str(num-15))
+ #   cm_LSTM_CNN_para_plt.savefig('D:\\programers\\programmers\\SectrumSenseLSTM\\cm_pictrues\\cm_plot_LSTM_CNN_para'+str(num-15))
+#    cm_LSTM_CNN_serial_plt.savefig('D:\\programers\\programmers\\SectrumSenseLSTM\\cm_pictrues\\cm_plot_LSTM_CNN_serial'+str(num-15))
+ #   cm_MME_plt.savefig('D:\\programers\\programmers\\SectrumSenseLSTM\\cm_pictrues\\cm_plot_MME'+str(num-15)) 
+      
+##绘制AUC
+snr_num = np.linspace(begin_snr,end_snr,end_snr-begin_snr+1)
+snr_auc_plt=snr_auc_plot(AUC_datas,snr_num)
+snr_auc_plt.savefig('D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\all picture\\auc\\auc-snr_plot')
+
+##绘制ACC
+snr_acc_plt=snr_acc_plot(ACC_datas,snr_num)
+snr_acc_plt.savefig('D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\all picture\\acc\\acc-snr_plot')   
+##绘制pd
+snr_pd_plt=snr_pd_plot(PD_datas,snr_num)
+snr_pd_plt.savefig('D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\all picture\\pd_snr\\pd-snr_plot')  
+
+#        plt.savefig("../results/mnist/confusion_matrix.png")     
+#save_array_x = np.array([1,2,3,4])
+#save_array_y = np.array([5,6,7,8])
+#sio.savemat(save_fn, {'array_x': save_array_x, 'array_x': save_array_x}) #同理，只是存入了两个不同的变量供
