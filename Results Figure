@@ -1,0 +1,180 @@
+def NormMinandMax(npdarr, min_temp, max_temp):
+    """"
+    将数据npdarr 归一化到[min,max]区间的方法
+    返回 副本
+    """
+    import numpy as np
+    Ymax = np.max(npdarr)  # 计算最大值
+    Ymin = np.min(npdarr)  # 计算最小值
+    k = (max_temp - min_temp) / (Ymax - Ymin)
+    last = min_temp + k * (npdarr - Ymin)
+    return last
+
+def cm_plot(cm):
+    import matplotlib.pyplot as plt #导入作图库
+    plt.matshow(cm, cmap=plt.cm.Greens) #画混淆矩阵图，配色风格使用cm.Greens，更多风格请参考官网。
+    plt.title('cm_matrix')
+    plt.colorbar() #颜色标签
+    for x in range(len(cm)): #数据标签
+      for y in range(len(cm)):
+        plt.annotate(cm[x,y], xy=(x, y), horizontalalignment='center', verticalalignment='center')
+    plt.ylabel('Predicted label') #坐标轴标签
+    plt.xlabel('True label') #坐标轴标签
+    return plt
+
+def roc_plot(score_data_temp,num):
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(5,5))
+    plt.grid()
+    plt.plot(score_data_temp['LSTM_scoredata'][num].fpr_temp, score_data_temp['LSTM_scoredata'][num].tpr_temp,'--', color='darkorange',
+         lw=1, label='LSTM') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(score_data_temp['CNN1D_scoredata'][num].fpr_temp, score_data_temp['CNN1D_scoredata'][num].tpr_temp,'--', color='darkblue',
+         lw=1, label='1D-CNN') ###假正率为横坐标，真正率为纵坐标做曲线
+
+    plt.plot(score_data_temp['LSTM_CNN_para_scoredata'][num].fpr_temp, score_data_temp['LSTM_CNN_para_scoredata'][num].tpr_temp,'--', color='deeppink',
+         lw=1, label='CNN-LSTM') ###假正率为横坐标，真正率为纵坐标做曲线
+    
+    #plt.plot([0,1], [0,1], color='navy', lw=2, linestyle='--')
+    plt.xlim([-0.05, 1.0+0.05])
+    plt.ylim([-0.05, 1+0.05])
+    plt.xlabel('Probability of false alarm')
+    plt.ylabel('Probability of detection')
+    plt.title('')
+    plt.legend(loc="lower right") 
+    return plt
+
+def snr_auc_plot(auc_list,snr_list):
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(5,5))
+    plt.grid()
+    plt.plot(snr_list,auc_list['LSTM_auc'],'-x', color='darkorange',
+         lw=1, label='LSTM AUC-SNR') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list, auc_list['CNN1D_auc'],'-+', color='darkblue',
+         lw=1, label='CNN1D AUC-SNR') ###假正率为横坐标，真正率为纵坐标做曲线
+
+    plt.plot(snr_list, auc_list['LSTM_CNN_para_auc'], '-o',color='deeppink',
+         lw=1, label='LSTM_CNN_para AUC-SNR') ###假正率为横坐标，真正率为纵坐标做曲线
+
+    #plt.plot([min(snr_list), max(snr_list)], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([min(snr_list)-0.05, 20])
+    plt.ylim([0.9, 1.05])
+    plt.xlabel('SNR(dB)')
+    plt.ylabel('AUC')
+    plt.title('AUC-SNR')
+    plt.legend(loc="lower right") 
+    return plt
+    
+def snr_acc_plot(acc_list,snr_list):
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(5,5))
+    plt.grid()
+    plt.plot(snr_list,acc_list['LSTM_acc'],'-x', color='darkorange',
+         lw=1, label='LSTM') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list, acc_list['CNN1D_acc'],'-+', color='darkblue',
+         lw=1, label='1D-CNN') ###假正率为横坐标，真正率为纵坐标做曲线
+
+    plt.plot(snr_list, acc_list['LSTM_CNN_para_acc'], '-o',color='deeppink',
+         lw=1, label='CNN-LSTM') ###假正率为横坐标，真正率为纵坐标做曲线
+
+    plt.plot(snr_list,acc_list['ED_acc'],'-.', color='darkgray',
+         lw=1, label='ED') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list,acc_list['MME_acc'],'--', color='darkgoldenrod',
+         lw=1, label='MME') ###假正率为横坐标，真正率为纵坐标做曲线
+    #plt.plot([min(snr_list), max(snr_list)], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([min(snr_list)-0.05, 20])
+    plt.ylim([0, 1+0.05])
+    plt.xlabel('SNR')
+    plt.ylabel('Acc')
+    plt.title('')
+    plt.legend(loc="lower right") 
+    return plt
+
+def snr_pd_plot(pd_list,snr_list):
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(5,5))
+    plt.grid()
+    plt.plot(snr_list,pd_list['LSTM_pd'],'-x', color='darkorange',
+         lw=1, label='LSTM') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list, pd_list['CNN1D_pd'],'-+', color='darkblue',
+         lw=1, label='1D-CNN') ###假正率为横坐标，真正率为纵坐标做曲线
+
+    plt.plot(snr_list, pd_list['LSTM_CNN_para_pd'], '-o',color='deeppink',
+         lw=1, label='CNN-LSTM') ###假正率为横坐标，真正率为纵坐标做曲线
+
+    plt.plot(snr_list,pd_list['ED_pd'],'-.', color='black',
+         lw=1, label='ED') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list,pd_list['MME_pd'],'--', color='darkgoldenrod',
+         lw=1, label='MME') ###假正率为横坐标，真正率为纵坐标做曲线
+    #plt.plot([min(snr_list), max(snr_list)], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([min(snr_list)-0.05, 20])
+    plt.ylim([0, 1+0.05])
+    plt.xlabel('SNR(dB)')
+    plt.ylabel('Probability of detection')
+    plt.title('')
+    plt.legend(loc="lower right") 
+    return plt
+    
+def snr_sigacc_plot(acc_matrix,snr_list):
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(5,5))
+    plt.grid()
+    plt.plot(snr_list,acc_matrix[0],'--', color='darkorange',
+         lw=1, label='4ASK') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list, acc_matrix[1],'--', color='darkblue',
+         lw=1, label='8ASK') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list, acc_matrix[2], '--',color='darkgreen',
+         lw=1, label='QPSK') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list, acc_matrix[3], '--',color='darkred',
+         lw=1, label='BPSK') ###假正率为横坐标，真正率为纵坐标做曲线
+    #plt.plot(snr_list,acc_matrix[4], '--',color='deeppink',
+        # lw=1, label='4FSK') ###假正率为横坐标，真正率为纵坐标做曲线
+   # plt.plot(snr_list,acc_matrix[5], '--',color='darksalmon',
+       #  lw=1, label='8FSK') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list,acc_matrix[6],'--', color='darkgray',
+         lw=1, label='LFM') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list,acc_matrix[7],'--', color='darkgoldenrod',
+         lw=1, label='16QAM') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list,acc_matrix[8],'--', color='black',
+         lw=1, label='32QAM') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list,acc_matrix[9],'--', color='darkviolet',
+         lw=1, label='64QAM') ###假正率为横坐标，真正率为纵坐标做曲线
+    #plt.plot([min(snr_list), max(snr_list)], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([min(snr_list)-0.05,20])
+    plt.ylim([0, 1+0.05])
+    plt.xlabel('SNR')
+    plt.ylabel('ACC')
+    plt.title('')
+    plt.legend(loc="lower right") 
+    return plt
+def snr_sigpd_plot(pd_matrix,snr_list):
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(5,5))
+    plt.grid()
+    plt.plot(snr_list,pd_matrix[0],'--', color='darkorange',
+         lw=1, label='4ASK') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list, pd_matrix[1],'--', color='darkblue',
+         lw=1, label='8ASK') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list, pd_matrix[2], '--',color='darkgreen',
+         lw=1, label='BPSK') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list, pd_matrix[3], '--',color='darkred',
+         lw=1, label='QPSK') ###假正率为横坐标，真正率为纵坐标做曲线
+   # plt.plot(snr_list,pd_matrix[4], '--',color='deeppink',
+       #  lw=1, label='4FSK') ###假正率为横坐标，真正率为纵坐标做曲线
+   # plt.plot(snr_list,pd_matrix[5], '--',color='darksalmon',
+      #   lw=1, label='8FSK') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list,pd_matrix[6],'--', color='darkgray',
+         lw=1, label='16QAM') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list,pd_matrix[7],'--', color='darkgoldenrod',
+         lw=1, label='32QAM') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list,pd_matrix[8],'--', color='black',
+         lw=1, label='64QAM') ###假正率为横坐标，真正率为纵坐标做曲线
+    plt.plot(snr_list,pd_matrix[9],'--', color='darkviolet',
+         lw=1, label='LFM') ###假正率为横坐标，真正率为纵坐标做曲线
+    #plt.plot([min(snr_list), max(snr_list)], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([min(snr_list)-0.05,20])
+    plt.ylim([0, 1+0.05])
+    plt.xlabel('SNR(dB)')
+    plt.ylabel('Probability of detection')
+    plt.title('')
+    plt.legend(loc="lower right") 
+    return plt
