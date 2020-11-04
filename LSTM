@@ -1,0 +1,97 @@
+from __future__ import print_function
+
+#import scipy.io as sio
+import h5py
+import numpy as np
+import keras
+import random
+from scipy.fftpack import fft
+from keras.models import Sequential
+from keras.layers import Dense,Dropout,BatchNormalization
+from keras.layers import LSTM
+from keras.optimizers import Adam
+from DP_eval_functions import NormMinandMax
+# 数据设置情况
+batch_size = 128
+num_classes = 2
+epochs = 40
+
+##数据需要归一化和打乱顺序
+datapath = 'D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\sample\\data FSK\\spectrum_data_train.mat'
+
+
+Spectrum_train_data =  h5py.File(datapath,'r')
+Spectrum_train_X = Spectrum_train_data['spectrum_data_trainX'][:]
+Spectrum_train_Y = Spectrum_train_data['spectrum_data_trainY'][:]
+Spectrum_test_X = Spectrum_train_data['spectrum_data_testX'][:]
+Spectrum_test_Y = Spectrum_train_data['spectrum_data_testY'][:]
+
+Spectrum_train_X = np.transpose(Spectrum_train_X)
+Spectrum_test_X = np.transpose(Spectrum_test_X)
+#Spectrum_train_Y = np.transpose(Spectrum_train_Y)
+#Spectrum_test_Y = np.transpose(Spectrum_test_Y)
+##数据归一化
+Spectrum_train_data.close()
+#Spectrum_train_X = abs(fft(Spectrum_train_X))
+#Spectrum_test_X = abs(fft(Spectrum_test_X))
+for i in range(0,len(Spectrum_train_X)):
+   Spectrum_train_X[i] = NormMinandMax(Spectrum_train_X[i],0,1)
+for i in range(0,len(Spectrum_test_X)):
+   Spectrum_test_X[i] = NormMinandMax(Spectrum_test_X[i],0,1)
+##打乱顺序
+#print(Spectrum_train_X[0])
+
+index_train = [i for i in range(len(Spectrum_train_X))]
+index_test = [i for i in range(len(Spectrum_test_X))]
+
+random.shuffle(index_train)
+random.shuffle(index_test)
+
+Spectrum_train_X = Spectrum_train_X[index_train]
+Spectrum_test_X = Spectrum_test_X[index_test]
+
+Spectrum_train_Y = Spectrum_train_Y[index_train]
+Spectrum_test_Y = Spectrum_test_Y[index_test]
+
+
+print('Spectrum_train_X:', Spectrum_train_X.shape)
+print('Spectrum_train_Y:',Spectrum_train_Y.shape)
+print('Spectrum_test_X:', Spectrum_test_X.shape)
+print('Spectrum_test_Y:',Spectrum_test_Y.shape)
+
+##加入卷积层的数据处理方式
+Spectrum_train_X = Spectrum_train_X.reshape(-1,60,60)
+Spectrum_test_X = Spectrum_test_X.reshape(-1,60,60)
+Spectrum_train_X = Spectrum_train_X.astype('float32')
+Spectrum_test_X = Spectrum_test_X.astype('float32')
+
+Spectrum_train_Y = keras.utils.to_categorical(Spectrum_train_Y, num_classes)
+Spectrum_test_Y = keras.utils.to_categorical(Spectrum_test_Y, num_classes)
+
+model = Sequential()
+model.add(LSTM(128, return_sequences=True,input_shape=(60,60)))
+#model.add(BatchNormalization())
+#model.add(LSTM(128, return_sequences=True))
+model.add(LSTM(64, return_sequences=False))
+#model.add(LSTM(128,activation = 'relu'))
+#model.add(Dropout(0.3))
+
+model.add(Dense(2,activation='softmax'))  
+adam = Adam(lr=0.001,beta_1=0.9,beta_2=0.999,epsilon=None,decay=0,amsgrad=False)
+model.summary()
+model.compile(loss='categorical_crossentropy',
+              optimizer=adam,
+              metrics=['accuracy'])
+
+model.fit(Spectrum_train_X, Spectrum_train_Y,
+          batch_size=batch_size,
+          epochs=epochs,
+          verbose=1,
+         validation_split=0.2
+         # validation_data = (Spectrum_test_X, Spectrum_test_Y)
+         )
+
+scores = model.evaluate(Spectrum_test_X, Spectrum_test_Y, verbose=0)
+print('RNN test score:', scores[0])
+print('RNN test accuracy:', scores[1])
+model.save('D:\\Spectrum_sense\\Sectrum Sense paper\\sample\\sample\\model\\LSTM_FSK11_model.h5')
